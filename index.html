@@ -297,57 +297,53 @@
       }
     };
 
-    // Generate synthetic but realistic pollution data
-    function generatePollutionData() {
-      const data = {};
-      
-      Object.keys(pollutants).forEach(pollutant => {
-        data[pollutant] = {};
-        const p = pollutants[pollutant];
-        
-        for (let year = 2015; year <= 2026; year++) {
-          data[pollutant][year] = [];
-          const daysInYear = (year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)) ? 366 : 365;
-          
-          const yearTrend = 1 - (year - 2015) * 0.02;
-          
-          for (let day = 0; day < daysInYear; day++) {
-            const seasonalAngle = (day / daysInYear) * Math.PI * 2;
-            let seasonalFactor;
-            
-            if (pollutant === 'O3') {
-              seasonalFactor = 0.5 + 0.5 * Math.sin(seasonalAngle - Math.PI / 2);
-            } else if (pollutant === 'PM2.5' || pollutant === 'PM10') {
-              seasonalFactor = 0.6 + 0.4 * Math.cos(seasonalAngle);
-            } else if (pollutant === 'NO2' || pollutant === 'CO') {
-              seasonalFactor = 0.55 + 0.45 * Math.cos(seasonalAngle);
-            } else {
-              seasonalFactor = 0.7 + 0.3 * Math.cos(seasonalAngle);
-            }
-            
-            const dayOfWeek = (day + new Date(year, 0, 1).getDay()) % 7;
-            const weekendFactor = (dayOfWeek === 0 || dayOfWeek === 6) ? 0.75 : 1;
-            
-            const randomFactor = 0.6 + Math.random() * 0.8;
-            
-            let value = p.max * 0.4 * seasonalFactor * yearTrend * weekendFactor * randomFactor;
-            
-            if (Math.random() < 0.02) {
-              value *= 1.5 + Math.random();
-            }
-            
-            value = Math.max(1, Math.min(p.max, value));
-            
-            data[pollutant][year].push(Math.round(value * 10) / 10);
-          }
-        }
-      });
-      
-      return data;
-    }
+    // Load real CSV data from GitHub
+async function loadCSVData() {
+  const response = await fetch('shanghai.csv'); // 确保文件在同级目录
+  const text = await response.text();
+
+  const rows = text.trim().split('\n');
+  const headers = rows[0].split(/\s+/);
+
+  const data = {};
+
+  Object.keys(pollutants).forEach(p => {
+    data[p] = {};
+  });
+
+  for (let i = 1; i < rows.length; i++) {
+    const cols = rows[i].split(/\s+/);
+
+    const dateStr = cols[0];
+    const date = new Date(dateStr);
+    const year = date.getFullYear();
+    const dayOfYear = Math.floor(
+      (date - new Date(year, 0, 0)) / 86400000
+    ) - 1;
+
+    const mapping = {
+      'PM2.5': parseFloat(cols[1]),
+      'PM10': parseFloat(cols[2]),
+      'O3': parseFloat(cols[3]),
+      'NO2': parseFloat(cols[4]),
+      'SO2': parseFloat(cols[5]),
+      'CO': parseFloat(cols[6])
+    };
+
+    Object.keys(mapping).forEach(pollutant => {
+      if (!data[pollutant][year]) {
+        data[pollutant][year] = [];
+      }
+      data[pollutant][year][dayOfYear] = mapping[pollutant];
+    });
+  }
+
+  return data;
+}
+
 
     // State
-    let pollutionData = generatePollutionData();
+    let pollutionData = {};
     let selectedPollutant = 'PM2.5';
     let yearStart = 2015;
     let yearEnd = 2026;
