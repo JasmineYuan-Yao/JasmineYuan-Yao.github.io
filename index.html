@@ -1,981 +1,904 @@
 <!doctype html>
-<html lang="zh-CN" class="h-full">
+<html lang="en" class="h-full">
  <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>城市空气污染径向热力图</title>
+  <title>Urban Air Quality Chronicle</title>
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
   <script src="/_sdk/element_sdk.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
   <style>
-    * { box-sizing: border-box; }
-    body {
-      font-family: 'Noto Sans SC', sans-serif;
-      background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
-    }
+    * { font-family: 'Space Grotesk', sans-serif; }
     .mono { font-family: 'JetBrains Mono', monospace; }
     
-    /* Radial chart styles */
-    .radial-segment {
-      transition: opacity 0.2s ease, transform 0.15s ease;
-      cursor: pointer;
-    }
-    .radial-segment:hover {
-      opacity: 1 !important;
-      filter: brightness(1.2);
-    }
-    
-    /* Pollutant buttons */
-    .pollutant-btn {
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    .radial-container {
       position: relative;
-      overflow: hidden;
-    }
-    .pollutant-btn::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, transparent 50%);
-      opacity: 0;
-      transition: opacity 0.3s ease;
-    }
-    .pollutant-btn:hover::before { opacity: 1; }
-    .pollutant-btn.active {
-      transform: scale(1.05);
-      box-shadow: 0 0 20px rgba(var(--glow-color), 0.5);
     }
     
-    /* Tooltip */
     .tooltip {
       pointer-events: none;
       transition: opacity 0.15s ease, transform 0.15s ease;
-      backdrop-filter: blur(12px);
     }
     
-    /* Year slider */
-    .year-range-track {
-      background: linear-gradient(90deg, #334155 0%, #475569 50%, #334155 100%);
+    .year-ring {
+      transition: opacity 0.3s ease;
     }
     
-    /* Narrative mode */
+    .pollutant-btn {
+      transition: all 0.2s ease;
+    }
+    
+    .pollutant-btn.active {
+      transform: scale(1.05);
+    }
+    
     .narrative-overlay {
       backdrop-filter: blur(8px);
-      animation: fadeIn 0.5s ease-out;
+      -webkit-backdrop-filter: blur(8px);
     }
-    @keyframes fadeIn {
-      from { opacity: 0; }
-      to { opacity: 1; }
-    }
-    @keyframes pulse {
-      0%, 100% { opacity: 0.4; }
-      50% { opacity: 1; }
-    }
-    .narrative-highlight {
+    
+    .pulse-ring {
       animation: pulse 2s ease-in-out infinite;
     }
     
-    /* Legend gradient */
+    @keyframes pulse {
+      0%, 100% { opacity: 0.3; transform: scale(1); }
+      50% { opacity: 0.6; transform: scale(1.02); }
+    }
+    
+    .fade-in {
+      animation: fadeIn 0.5s ease forwards;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .gradient-text {
+      background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 50%, #f472b6 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      background: transparent;
+    }
+    
+    input[type="range"]::-webkit-slider-track {
+      height: 6px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 3px;
+    }
+    
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      background: #60a5fa;
+      border-radius: 50%;
+      cursor: pointer;
+      margin-top: -6px;
+      box-shadow: 0 0 10px rgba(96, 165, 250, 0.5);
+    }
+    
     .legend-gradient {
-      background: linear-gradient(90deg, 
-        #22c55e 0%, 
-        #84cc16 20%, 
-        #eab308 40%, 
-        #f97316 60%, 
-        #ef4444 80%, 
-        #7c2d12 100%
-      );
+      height: 12px;
+      border-radius: 6px;
     }
     
-    /* Scrollbar */
-    ::-webkit-scrollbar { width: 6px; height: 6px; }
-    ::-webkit-scrollbar-track { background: #1e293b; }
-    ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
-    ::-webkit-scrollbar-thumb:hover { background: #64748b; }
-    
-    /* Month labels animation */
-    .month-label {
-      transition: opacity 0.3s ease, transform 0.3s ease;
-    }
-    
-    /* Stats cards */
-    .stat-card {
-      background: linear-gradient(135deg, rgba(30,41,59,0.8) 0%, rgba(15,23,42,0.9) 100%);
-      border: 1px solid rgba(71,85,105,0.5);
-      transition: all 0.3s ease;
-    }
-    .stat-card:hover {
-      border-color: rgba(99,102,241,0.5);
-      transform: translateY(-2px);
+    .season-label {
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
     }
   </style>
   <style>body { box-sizing: border-box; }</style>
   <script src="/_sdk/data_sdk.js" type="text/javascript"></script>
  </head>
- <body class="h-full overflow-auto">
-  <div id="app" class="min-h-full w-full p-4 md:p-6 lg:p-8"><!-- Header -->
-   <header class="max-w-7xl mx-auto mb-6">
-    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+ <body class="h-full bg-slate-950 text-white overflow-auto">
+  <div id="app" class="w-full min-h-full"><!-- Header -->
+   <header class="px-6 py-4 border-b border-white/10">
+    <div class="max-w-7xl mx-auto flex items-center justify-between">
      <div>
-      <h1 id="main-title" class="text-2xl md:text-3xl lg:text-4xl font-bold text-white tracking-tight">城市空气质量年轮图</h1>
-      <p class="text-slate-400 mt-1 text-sm md:text-base"><span id="city-display">北京</span> · 2015-2026 · 每日污染物浓度可视化</p>
-     </div><button id="narrative-btn" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-medium transition-all flex items-center gap-2 self-start md:self-auto">
-      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /> <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg> 开启叙事模式 </button>
+      <h1 id="main-title" class="text-2xl font-bold gradient-text">Urban Air Quality Chronicle</h1>
+      <p id="subtitle" class="text-slate-400 text-sm mt-1">A decade of atmospheric data visualized</p>
+     </div><button id="narrative-btn" class="px-4 py-2 bg-gradient-to-r from-blue-500/20 to-purple-500/20 border border-white/20 rounded-full text-sm font-medium hover:border-white/40 transition-all flex items-center gap-2">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /> <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg> Story Mode </button>
     </div>
    </header><!-- Main Content -->
-   <main class="max-w-7xl mx-auto"><!-- Controls Panel -->
-    <div class="bg-slate-800/50 rounded-2xl p-4 md:p-6 mb-6 border border-slate-700/50"><!-- Pollutant Selector -->
-     <div class="mb-6"><label class="text-slate-300 text-sm font-medium mb-3 block">选择污染物</label>
-      <div id="pollutant-buttons" class="flex flex-wrap gap-2 md:gap-3"><!-- Buttons generated by JS -->
-      </div>
-     </div><!-- Year Range -->
-     <div><label class="text-slate-300 text-sm font-medium mb-3 block">年份范围</label>
-      <div class="flex items-center gap-4"><span id="year-start-label" class="mono text-white text-lg font-medium w-16">2015</span>
-       <div class="flex-1 relative">
-        <div class="year-range-track h-2 rounded-full relative">
-         <div id="year-range-fill" class="absolute h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full"></div>
-        </div><input type="range" id="year-start" min="2015" max="2026" value="2015" class="absolute inset-0 w-full h-2 opacity-0 cursor-pointer"> <input type="range" id="year-end" min="2015" max="2026" value="2026" class="absolute inset-0 w-full h-2 opacity-0 cursor-pointer">
-       </div><span id="year-end-label" class="mono text-white text-lg font-medium w-16 text-right">2026</span>
-      </div>
-      <div id="year-pills" class="flex flex-wrap gap-2 mt-3"><!-- Year pills generated by JS -->
-      </div>
-     </div>
-    </div><!-- Visualization Area -->
-    <div class="grid grid-cols-1 lg:grid-cols-4 gap-6"><!-- Radial Chart -->
-     <div class="lg:col-span-3 bg-slate-800/30 rounded-2xl p-4 md:p-6 border border-slate-700/50 relative">
-      <div id="chart-container" class="relative w-full" style="padding-bottom: 100%; max-height: 700px;">
-       <svg id="radial-chart" class="absolute inset-0 w-full h-full"></svg><!-- Tooltip -->
-       <div id="tooltip" class="tooltip absolute hidden bg-slate-900/95 border border-slate-600 rounded-xl p-4 shadow-2xl z-50 min-w-[200px]">
-        <div class="text-slate-400 text-xs mb-1" id="tooltip-date"></div>
-        <div class="text-white font-semibold text-lg mb-2" id="tooltip-value"></div>
-        <div class="flex items-center gap-2">
-         <div id="tooltip-level-dot" class="w-3 h-3 rounded-full"></div><span id="tooltip-level" class="text-sm"></span>
+   <main class="max-w-7xl mx-auto px-6 py-6">
+    <div class="grid grid-cols-1 lg:grid-cols-4 gap-6"><!-- Controls Panel -->
+     <aside class="lg:col-span-1 space-y-6"><!-- Pollutant Selection -->
+      <div class="bg-white/5 rounded-2xl p-5 border border-white/10">
+       <h3 class="text-xs uppercase tracking-wider text-slate-400 mb-4">Pollutant</h3>
+       <div id="pollutant-buttons" class="grid grid-cols-2 gap-2"><!-- Buttons populated by JS -->
+       </div>
+      </div><!-- Year Range -->
+      <div class="bg-white/5 rounded-2xl p-5 border border-white/10">
+       <h3 class="text-xs uppercase tracking-wider text-slate-400 mb-4">Year Range</h3>
+       <div class="space-y-4">
+        <div><label class="text-xs text-slate-500">From</label> <input type="range" id="year-start" min="2015" max="2026" value="2015" class="w-full mt-1"> <span id="year-start-val" class="mono text-sm text-blue-400">2015</span>
+        </div>
+        <div><label class="text-xs text-slate-500">To</label> <input type="range" id="year-end" min="2015" max="2026" value="2026" class="w-full mt-1"> <span id="year-end-val" class="mono text-sm text-blue-400">2026</span>
         </div>
        </div>
       </div><!-- Legend -->
-      <div class="mt-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-       <div class="flex items-center gap-3">
-        <div class="legend-gradient w-32 md:w-48 h-3 rounded-full"></div>
-        <div class="flex justify-between text-xs text-slate-400 w-32 md:w-48 -ml-32 md:-ml-48"><span>优</span> <span>良</span> <span>轻度</span> <span>中度</span> <span>重度</span> <span>严重</span>
+      <div class="bg-white/5 rounded-2xl p-5 border border-white/10">
+       <h3 class="text-xs uppercase tracking-wider text-slate-400 mb-4">Concentration Scale</h3>
+       <div id="legend-gradient" class="legend-gradient mb-2"></div>
+       <div class="flex justify-between text-xs mono text-slate-400"><span id="legend-min">0</span> <span id="legend-unit" class="text-slate-500">μg/m³</span> <span id="legend-max">150</span>
+       </div>
+      </div><!-- Stats -->
+      <div class="bg-white/5 rounded-2xl p-5 border border-white/10">
+       <h3 class="text-xs uppercase tracking-wider text-slate-400 mb-4">Statistics</h3>
+       <div class="space-y-3">
+        <div class="flex justify-between"><span class="text-slate-400 text-sm">Average</span> <span id="stat-avg" class="mono text-sm text-blue-400">--</span>
+        </div>
+        <div class="flex justify-between"><span class="text-slate-400 text-sm">Maximum</span> <span id="stat-max" class="mono text-sm text-red-400">--</span>
+        </div>
+        <div class="flex justify-between"><span class="text-slate-400 text-sm">Minimum</span> <span id="stat-min" class="mono text-sm text-green-400">--</span>
+        </div>
+        <div class="flex justify-between"><span class="text-slate-400 text-sm">Trend</span> <span id="stat-trend" class="mono text-sm">--</span>
         </div>
        </div>
-       <div id="current-pollutant-info" class="text-slate-400 text-sm"></div>
       </div>
-     </div><!-- Stats Panel -->
-     <div class="lg:col-span-1 space-y-4">
-      <div class="stat-card rounded-xl p-4">
-       <div class="text-slate-400 text-xs uppercase tracking-wider mb-1">
-        当前选择
+     </aside><!-- Visualization Area -->
+     <section class="lg:col-span-3">
+      <div class="bg-white/5 rounded-2xl p-6 border border-white/10 radial-container">
+       <div class="flex items-center justify-between mb-4">
+        <div>
+         <h2 id="viz-title" class="text-lg font-semibold">PM2.5 Concentration</h2>
+         <p class="text-slate-400 text-sm">Daily readings mapped to a radial calendar</p>
+        </div>
+        <div class="flex items-center gap-2 text-xs text-slate-400"><span class="w-2 h-2 bg-blue-400 rounded-full"></span> <span>Hover for details</span>
+        </div>
+       </div><!-- SVG Canvas -->
+       <div class="relative flex justify-center items-center" style="min-height: 500px;">
+        <svg id="radial-chart" viewbox="0 0 600 600" class="w-full max-w-lg"><!-- Chart elements populated by JS -->
+        </svg><!-- Tooltip -->
+        <div id="tooltip" class="tooltip absolute hidden bg-slate-900/95 border border-white/20 rounded-xl px-4 py-3 shadow-2xl z-50">
+         <div class="text-xs text-slate-400 uppercase tracking-wider mb-1" id="tooltip-date">
+          --
+         </div>
+         <div class="text-2xl font-bold mono" id="tooltip-value">
+          --
+         </div>
+         <div class="text-xs text-slate-500" id="tooltip-unit">
+          μg/m³
+         </div>
+        </div>
+       </div><!-- Month Labels -->
+       <div class="flex justify-center gap-4 mt-4 text-xs text-slate-500 flex-wrap"><span>Jan</span><span>Feb</span><span>Mar</span><span>Apr</span> <span>May</span><span>Jun</span><span>Jul</span><span>Aug</span> <span>Sep</span><span>Oct</span><span>Nov</span><span>Dec</span>
        </div>
-       <div id="stat-pollutant" class="text-2xl font-bold text-white">
-        PM2.5
-       </div>
-       <div id="stat-unit" class="text-slate-500 text-sm">
-        μg/m³
-       </div>
+      </div><!-- Insights Panel -->
+      <div class="mt-6 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-2xl p-6 border border-white/10">
+       <h3 class="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+        <svg class="w-4 h-4 text-yellow-400" fill="currentColor" viewbox="0 0 20 20"><path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1z" /> <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm0-2a6 6 0 100-12 6 6 0 000 12z" clip-rule="evenodd" />
+        </svg> Key Insight</h3>
+       <p id="insight-text" class="text-slate-400 text-sm leading-relaxed">Select a pollutant and adjust the year range to explore patterns in urban air quality data.</p>
       </div>
-      <div class="stat-card rounded-xl p-4">
-       <div class="text-slate-400 text-xs uppercase tracking-wider mb-1">
-        年均值趋势
-       </div>
-       <div id="stat-trend" class="text-xl font-bold text-emerald-400 flex items-center gap-2">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-        </svg> -32%
-       </div>
-       <div class="text-slate-500 text-sm">
-        相较于2015年
-       </div>
-      </div>
-      <div class="stat-card rounded-xl p-4">
-       <div class="text-slate-400 text-xs uppercase tracking-wider mb-1">
-        最高污染季节
-       </div>
-       <div id="stat-season" class="text-xl font-bold text-amber-400">
-        冬季
-       </div>
-       <div id="stat-season-detail" class="text-slate-500 text-sm">
-        12月-2月
-       </div>
-      </div>
-      <div class="stat-card rounded-xl p-4">
-       <div class="text-slate-400 text-xs uppercase tracking-wider mb-1">
-        达标天数
-       </div>
-       <div id="stat-good-days" class="text-xl font-bold text-white"><span class="text-emerald-400">68%</span>
-       </div>
-       <div class="text-slate-500 text-sm">
-        优良天数占比
-       </div>
-      </div>
-      <div class="stat-card rounded-xl p-4">
-       <div class="text-slate-400 text-xs uppercase tracking-wider mb-1">
-        数据覆盖
-       </div>
-       <div id="stat-coverage" class="text-lg font-bold text-white">
-        4,383 天
-       </div>
-       <div class="text-slate-500 text-sm">
-        完整监测记录
-       </div>
-      </div>
-     </div>
+     </section>
     </div>
    </main><!-- Narrative Mode Overlay -->
-   <div id="narrative-overlay" class="fixed inset-0 bg-slate-900/90 z-50 hidden narrative-overlay overflow-auto">
-    <div class="min-h-full flex flex-col items-center justify-center p-6">
-     <div class="max-w-4xl w-full"><!-- Narrative Header -->
-      <div class="text-center mb-8">
-       <h2 class="text-3xl md:text-4xl font-bold text-white mb-2">空气质量的十年变迁</h2>
-       <p class="text-slate-400">从数据中读懂城市的呼吸</p>
-      </div><!-- Narrative Steps -->
-      <div id="narrative-content" class="bg-slate-800/50 rounded-2xl p-6 md:p-8 border border-slate-700/50"><!-- Content populated by JS -->
-      </div><!-- Navigation -->
-      <div class="flex items-center justify-between mt-6"><button id="narrative-prev" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"> ← 上一步 </button>
-       <div id="narrative-progress" class="flex gap-2"><!-- Progress dots -->
-       </div><button id="narrative-next" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-colors"> 下一步 → </button>
-      </div><!-- Close Button --> <button id="narrative-close" class="absolute top-6 right-6 text-slate-400 hover:text-white transition-colors">
-       <svg class="w-8 h-8" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-       </svg></button>
+   <div id="narrative-overlay" class="hidden fixed inset-0 bg-slate-950/90 narrative-overlay z-50 flex items-center justify-center">
+    <div class="max-w-2xl mx-auto px-8 text-center"><button id="close-narrative" class="absolute top-6 right-6 text-slate-400 hover:text-white transition-colors">
+      <svg class="w-8 h-8" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+      </svg></button>
+     <div id="narrative-content" class="fade-in"><!-- Populated by JS -->
+     </div>
+     <div class="flex justify-center gap-4 mt-8"><button id="prev-narrative" class="px-6 py-2 border border-white/20 rounded-full text-sm hover:bg-white/10 transition-colors disabled:opacity-30"> ← Previous </button>
+      <div id="narrative-dots" class="flex items-center gap-2"><!-- Dots populated by JS -->
+      </div><button id="next-narrative" class="px-6 py-2 bg-blue-500 rounded-full text-sm hover:bg-blue-600 transition-colors"> Next → </button>
      </div>
     </div>
-   </div><!-- Footer -->
-   <footer class="max-w-7xl mx-auto mt-8 text-center text-slate-500 text-sm pb-4">
-    <p>数据来源：模拟数据 · 可视化设计灵感来自年轮与生命周期</p>
-   </footer>
+   </div>
   </div>
   <script>
-    // Default configuration
+    // Configuration
     const defaultConfig = {
-      chart_title: '城市空气质量年轮图',
-      city_name: '北京',
-      primary_color: '#0f172a',
+      main_title: 'Urban Air Quality Chronicle',
+      subtitle: 'A decade of atmospheric data visualized',
+      primary_color: '#60a5fa',
       secondary_color: '#1e293b',
-      text_color: '#f8fafc',
-      accent_color: '#6366f1',
-      highlight_color: '#22c55e'
+      text_color: '#f1f5f9',
+      accent_color: '#a78bfa',
+      background_color: '#020617'
     };
 
-    // Application state
     let config = { ...defaultConfig };
-    let currentPollutant = 'PM2.5';
+
+    // Pollutant definitions with realistic data ranges and color scales
+    const pollutants = {
+      'PM2.5': { 
+        name: 'PM2.5', 
+        fullName: 'Fine Particulate Matter',
+        unit: 'μg/m³', 
+        max: 150, 
+        colors: ['#10b981', '#84cc16', '#facc15', '#f97316', '#ef4444', '#991b1b'],
+        thresholds: [12, 35, 55, 150, 250],
+        description: 'Tiny particles less than 2.5 micrometers that can penetrate deep into lungs'
+      },
+      'PM10': { 
+        name: 'PM10', 
+        fullName: 'Coarse Particulate Matter',
+        unit: 'μg/m³', 
+        max: 250, 
+        colors: ['#06b6d4', '#22d3ee', '#fcd34d', '#fb923c', '#dc2626', '#7f1d1d'],
+        thresholds: [50, 100, 150, 200, 300],
+        description: 'Particles smaller than 10 micrometers, including dust and pollen'
+      },
+      'O3': { 
+        name: 'O₃', 
+        fullName: 'Ground-level Ozone',
+        unit: 'ppb', 
+        max: 120, 
+        colors: ['#8b5cf6', '#a78bfa', '#fbbf24', '#f59e0b', '#dc2626', '#881337'],
+        thresholds: [50, 70, 85, 105, 200],
+        description: 'Formed by chemical reactions between NOx and VOCs in sunlight'
+      },
+      'NO2': { 
+        name: 'NO₂', 
+        fullName: 'Nitrogen Dioxide',
+        unit: 'ppb', 
+        max: 100, 
+        colors: ['#14b8a6', '#5eead4', '#a3e635', '#fde047', '#f87171', '#b91c1c'],
+        thresholds: [30, 50, 80, 100, 150],
+        description: 'Primarily from vehicle emissions and power plants'
+      },
+      'SO2': { 
+        name: 'SO₂', 
+        fullName: 'Sulfur Dioxide',
+        unit: 'ppb', 
+        max: 75, 
+        colors: ['#22c55e', '#86efac', '#bef264', '#fef08a', '#fca5a5', '#dc2626'],
+        thresholds: [20, 40, 60, 80, 100],
+        description: 'Released from burning fossil fuels containing sulfur'
+      },
+      'CO': { 
+        name: 'CO', 
+        fullName: 'Carbon Monoxide',
+        unit: 'ppm', 
+        max: 10, 
+        colors: ['#3b82f6', '#60a5fa', '#93c5fd', '#fcd34d', '#fb7185', '#e11d48'],
+        thresholds: [2, 4, 6, 8, 12],
+        description: 'Colorless, odorless gas from incomplete combustion'
+      }
+    };
+
+       // Load real CSV data from GitHub
+   async function loadCSVData() {
+     const response = await fetch('shanghai.csv'); // 确保文件在同级目录
+     const text = await response.text();
+     
+     const rows = text.trim().split('\n');
+     const headers = rows[0].split(/\s+/);
+     
+     const data = {};
+     
+     Object.keys(pollutants).forEach(p => {
+      data[p] = {};
+     });
+     
+     for (let i = 1; i < rows.length; i++) {
+      const cols = rows[i].split(/\s+/);
+      
+      const dateStr = cols[0];
+      const date = new Date(dateStr);
+      const year = date.getFullYear();
+      const dayOfYear = Math.floor(
+       (date - new Date(year, 0, 0)) / 86400000
+      ) - 1;
+      
+      const mapping = {
+       'PM2.5': parseFloat(cols[1]),
+       'PM10': parseFloat(cols[2]),
+       'O3': parseFloat(cols[3]),
+       'NO2': parseFloat(cols[4]),
+       'SO2': parseFloat(cols[5]),
+       'CO': parseFloat(cols[6])
+      };
+      
+      Object.keys(mapping).forEach(pollutant => {
+       if (!data[pollutant][year]) {
+        data[pollutant][year] = [];
+       }
+       data[pollutant][year][dayOfYear] = mapping[pollutant];
+      });
+     }
+     
+     return data;
+    }
+
+
+    // State
+   let pollutionData = {};
+   let selectedPollutant = 'PM2.5';
     let yearStart = 2015;
     let yearEnd = 2026;
-    let allData = [];
     let narrativeStep = 0;
 
-    // Pollutant definitions
-    const pollutants = {
-      'PM2.5': { unit: 'μg/m³', limits: [35, 75, 115, 150, 250, 500], color: '#f97316', description: '细颗粒物，直径≤2.5微米' },
-      'PM10': { unit: 'μg/m³', limits: [50, 150, 250, 350, 420, 600], color: '#eab308', description: '可吸入颗粒物，直径≤10微米' },
-      'O3': { unit: 'μg/m³', limits: [100, 160, 215, 265, 800, 1000], color: '#22c55e', description: '臭氧，光化学污染指标' },
-      'NO2': { unit: 'μg/m³', limits: [40, 80, 180, 280, 565, 940], color: '#ef4444', description: '二氧化氮，交通污染指标' },
-      'SO2': { unit: 'μg/m³', limits: [50, 150, 475, 800, 1600, 2620], color: '#a855f7', description: '二氧化硫，工业污染指标' },
-      'CO': { unit: 'mg/m³', limits: [2, 4, 14, 24, 36, 60], color: '#64748b', description: '一氧化碳，燃烧污染指标' }
-    };
-
-    // AQI level names and colors
-    const aqiLevels = [
-      { name: '优', color: '#22c55e' },
-      { name: '良', color: '#84cc16' },
-      { name: '轻度污染', color: '#eab308' },
-      { name: '中度污染', color: '#f97316' },
-      { name: '重度污染', color: '#ef4444' },
-      { name: '严重污染', color: '#7c2d12' }
-    ];
-
-    // Narrative steps
+    // Narrative content
     const narrativeSteps = [
       {
-        title: '欢迎来到空气质量年轮图',
-        content: `<p class="text-slate-300 text-lg leading-relaxed mb-4">这是一张独特的数据可视化图表，它将12年的空气质量数据浓缩在一张"年轮"之中。</p>
-        <p class="text-slate-400 leading-relaxed mb-4">就像树木的年轮记录着每一年的生长，这张图记录着城市每一天的"呼吸"状况。</p>
-        <div class="bg-slate-700/50 rounded-lg p-4 mt-6">
-          <h4 class="text-white font-medium mb-2">如何阅读这张图？</h4>
-          <ul class="text-slate-400 space-y-2 text-sm">
-            <li>• <span class="text-white">角度</span> 代表一年中的第几天（从1月1日到12月31日）</li>
-            <li>• <span class="text-white">圆环</span> 代表不同年份（内圈是2015年，外圈是2026年）</li>
-            <li>• <span class="text-white">颜色</span> 代表污染浓度（绿色→红色 = 优→差）</li>
-          </ul>
-        </div>`,
-        highlight: 'overview'
+        title: 'Welcome to the Air Quality Chronicle',
+        content: 'This visualization reveals patterns in urban air pollution over a decade. Each ring represents one year, with 365 days spiraling around the center. Colors shift from green (clean) to red (hazardous).',
+        highlight: null
       },
       {
-        title: '季节性规律：冬季的困扰',
-        content: `<p class="text-slate-300 text-lg leading-relaxed mb-4">仔细观察图表，你会发现一个明显的规律：<span class="text-amber-400 font-semibold">红色区域集中在图表的底部和左侧</span>。</p>
-        <p class="text-slate-400 leading-relaxed mb-4">这对应的是11月到次年2月——北方供暖季。燃煤取暖、气象条件不利于扩散，共同造成了冬季的污染高峰。</p>
-        <div class="grid grid-cols-2 gap-4 mt-6">
-          <div class="bg-red-900/30 border border-red-700/50 rounded-lg p-4">
-            <div class="text-red-400 font-semibold mb-1">冬季（12-2月）</div>
-            <div class="text-white text-2xl font-bold">PM2.5 均值 89</div>
-            <div class="text-slate-400 text-sm">超标天数占比高达45%</div>
-          </div>
-          <div class="bg-emerald-900/30 border border-emerald-700/50 rounded-lg p-4">
-            <div class="text-emerald-400 font-semibold mb-1">夏季（6-8月）</div>
-            <div class="text-white text-2xl font-bold">PM2.5 均值 42</div>
-            <div class="text-slate-400 text-sm">优良天数占比达82%</div>
-          </div>
-        </div>`,
-        highlight: 'winter',
-        pollutant: 'PM2.5'
+        title: 'Reading the Radial Calendar',
+        content: 'The top of the circle is January 1st. Moving clockwise, you travel through the seasons: spring (right), summer (bottom), fall (left), and winter (top). Inner rings are earlier years.',
+        highlight: 'seasons'
       },
       {
-        title: '十年治理：看得见的进步',
-        content: `<p class="text-slate-300 text-lg leading-relaxed mb-4">从内圈到外圈，颜色整体在变浅变绿——这是<span class="text-emerald-400 font-semibold">十年空气治理成效</span>的直观体现。</p>
-        <p class="text-slate-400 leading-relaxed mb-4">2015年的年轮满是橙红，而2024-2026年的外圈，绿色明显增多。数据显示：</p>
-        <div class="bg-slate-700/50 rounded-lg p-6 mt-6">
-          <div class="text-center">
-            <div class="text-5xl font-bold text-emerald-400 mb-2">↓ 42%</div>
-            <div class="text-white font-medium">PM2.5 年均浓度下降</div>
-            <div class="text-slate-400 text-sm mt-1">从2015年的81μg/m³ 降至 2026年的47μg/m³</div>
-          </div>
-          <div class="grid grid-cols-3 gap-4 mt-6 text-center">
-            <div>
-              <div class="text-2xl font-bold text-white">+89</div>
-              <div class="text-slate-400 text-xs">年均优良天数增加</div>
-            </div>
-            <div>
-              <div class="text-2xl font-bold text-white">-67%</div>
-              <div class="text-slate-400 text-xs">重污染天数减少</div>
-            </div>
-            <div>
-              <div class="text-2xl font-bold text-white">85%</div>
-              <div class="text-slate-400 text-xs">2026年达标率</div>
-            </div>
-          </div>
-        </div>`,
+        title: 'The Heating Season Pattern',
+        content: 'Notice how PM2.5 and PM10 show darker colors in winter months (top of the circle). This reflects increased emissions from heating and temperature inversions that trap pollutants.',
+        highlight: 'PM2.5'
+      },
+      {
+        title: 'Summer Ozone Surge',
+        content: 'Switch to O₃ (ozone) and observe the pattern reversal—summer months show higher concentrations. Ozone forms when sunlight drives reactions between pollutants.',
+        highlight: 'O3'
+      },
+      {
+        title: 'A Decade of Progress',
+        content: 'Compare the outer rings (recent years) to inner rings (earlier years). Many pollutants show gradual improvement, reflecting cleaner technologies and regulations.',
         highlight: 'trend'
       },
       {
-        title: '新的挑战：臭氧污染',
-        content: `<p class="text-slate-300 text-lg leading-relaxed mb-4">切换到臭氧（O3）视图，你会发现一个<span class="text-amber-400 font-semibold">与PM2.5完全相反的规律</span>。</p>
-        <p class="text-slate-400 leading-relaxed mb-4">臭氧污染主要发生在夏季——高温强日照促进了光化学反应，使得夏季反而成为臭氧的高发期。</p>
-        <div class="bg-amber-900/20 border border-amber-700/50 rounded-lg p-4 mt-6">
-          <div class="flex items-start gap-3">
-            <svg class="w-6 h-6 text-amber-400 flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-            </svg>
-            <div>
-              <div class="text-amber-400 font-semibold mb-1">值得关注的趋势</div>
-              <p class="text-slate-400 text-sm">与PM2.5不同，臭氧浓度在过去十年呈上升趋势。这提醒我们：空气治理是一个复杂的系统工程，需要综合施策。</p>
-            </div>
-          </div>
-        </div>`,
-        highlight: 'summer',
-        pollutant: 'O3'
-      },
-      {
-        title: '开始你的探索',
-        content: `<p class="text-slate-300 text-lg leading-relaxed mb-4">现在，轮到你来探索这张"空气年轮图"了！</p>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
-          <div class="bg-slate-700/50 rounded-lg p-4">
-            <div class="text-indigo-400 font-semibold mb-2">🔍 探索建议</div>
-            <ul class="text-slate-400 text-sm space-y-2">
-              <li>• 切换不同污染物，比较季节规律</li>
-              <li>• 调整年份范围，聚焦特定时期</li>
-              <li>• 悬停查看每一天的精确数值</li>
-            </ul>
-          </div>
-          <div class="bg-slate-700/50 rounded-lg p-4">
-            <div class="text-emerald-400 font-semibold mb-2">💡 有趣的发现</div>
-            <ul class="text-slate-400 text-sm space-y-2">
-              <li>• 春节期间的空气变化</li>
-              <li>• 重大活动前后的对比</li>
-              <li>• 不同污染物的此消彼长</li>
-            </ul>
-          </div>
-        </div>
-        <p class="text-slate-400 mt-6 text-center">点击下方按钮，关闭叙事模式，开始自由探索 👇</p>`,
-        highlight: 'none'
+        title: 'Explore Freely',
+        content: 'Now it\'s your turn! Select different pollutants, adjust year ranges, and hover over the chart to discover the stories hidden in the data.',
+        highlight: null
       }
     ];
 
-    // Generate synthetic pollution data
-    function generateData() {
-      const data = [];
-      const years = [];
-      for (let y = 2015; y <= 2026; y++) years.push(y);
-      
-      years.forEach(year => {
-        const daysInYear = (year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)) ? 366 : 365;
-        const yearProgress = (year - 2015) / 11; // 0 to 1 progress through years
-        
-        for (let day = 1; day <= daysInYear; day++) {
-          const dayOfYear = day;
-          const monthProgress = dayOfYear / daysInYear;
-          
-          // Seasonal patterns
-          const winterFactor = Math.cos((monthProgress - 0.05) * Math.PI * 2) * 0.5 + 0.5; // Peak in winter
-          const summerFactor = Math.cos((monthProgress - 0.55) * Math.PI * 2) * 0.5 + 0.5; // Peak in summer
-          
-          // Year-over-year improvement for PM (gets better over time)
-          const pmImprovement = 1 - yearProgress * 0.4;
-          // Year-over-year worsening for O3 (slightly worse over time)
-          const o3Worsening = 1 + yearProgress * 0.15;
-          
-          // Random daily variation
-          const randomFactor = () => 0.7 + Math.random() * 0.6;
-          
-          // Special events (holidays, etc.)
-          let holidayFactor = 1;
-          if (dayOfYear >= 25 && dayOfYear <= 35) holidayFactor = 0.7; // Spring Festival
-          if (dayOfYear >= 275 && dayOfYear <= 285) holidayFactor = 0.75; // National Day
-          
-          // Calculate values for each pollutant
-          const pm25Base = 45 + winterFactor * 80;
-          const pm10Base = 70 + winterFactor * 100;
-          const o3Base = 60 + summerFactor * 120;
-          const no2Base = 35 + winterFactor * 50;
-          const so2Base = 15 + winterFactor * 40;
-          const coBase = 0.8 + winterFactor * 1.5;
-          
-          data.push({
-            year,
-            dayOfYear,
-            date: new Date(year, 0, dayOfYear),
-            'PM2.5': Math.max(5, Math.round(pm25Base * pmImprovement * randomFactor() * holidayFactor)),
-            'PM10': Math.max(10, Math.round(pm10Base * pmImprovement * randomFactor() * holidayFactor)),
-            'O3': Math.max(20, Math.round(o3Base * o3Worsening * randomFactor())),
-            'NO2': Math.max(10, Math.round(no2Base * pmImprovement * randomFactor() * holidayFactor)),
-            'SO2': Math.max(5, Math.round(so2Base * (pmImprovement * 0.7) * randomFactor() * holidayFactor)),
-            'CO': Math.max(0.3, Math.round((coBase * pmImprovement * randomFactor() * holidayFactor) * 10) / 10)
-          });
-        }
-      });
-      
-      return data;
-    }
-
-    // Get color for value based on pollutant limits
+    // Get color for value
     function getColor(value, pollutant) {
-      const limits = pollutants[pollutant].limits;
-      const colors = ['#22c55e', '#84cc16', '#eab308', '#f97316', '#ef4444', '#7c2d12'];
+      const p = pollutants[pollutant];
+      const normalized = value / p.max;
+      const colors = p.colors;
       
-      for (let i = 0; i < limits.length; i++) {
-        if (value <= limits[i]) {
-          if (i === 0) return colors[0];
-          // Interpolate between colors
-          const prevLimit = i === 0 ? 0 : limits[i - 1];
-          const ratio = (value - prevLimit) / (limits[i] - prevLimit);
-          return interpolateColor(colors[i - 1], colors[i], ratio);
-        }
-      }
-      return colors[colors.length - 1];
+      if (normalized <= 0) return colors[0];
+      if (normalized >= 1) return colors[colors.length - 1];
+      
+      const index = normalized * (colors.length - 1);
+      const lower = Math.floor(index);
+      const upper = Math.ceil(index);
+      const t = index - lower;
+      
+      // Interpolate between colors
+      const c1 = hexToRgb(colors[lower]);
+      const c2 = hexToRgb(colors[upper]);
+      
+      const r = Math.round(c1.r + (c2.r - c1.r) * t);
+      const g = Math.round(c1.g + (c2.g - c1.g) * t);
+      const b = Math.round(c1.b + (c2.b - c1.b) * t);
+      
+      return `rgb(${r}, ${g}, ${b})`;
     }
 
-    // Interpolate between two hex colors
-    function interpolateColor(color1, color2, ratio) {
-      const hex = (c) => parseInt(c.slice(1), 16);
-      const r = (c) => (c >> 16) & 255;
-      const g = (c) => (c >> 8) & 255;
-      const b = (c) => c & 255;
-      
-      const c1 = hex(color1);
-      const c2 = hex(color2);
-      
-      const red = Math.round(r(c1) + (r(c2) - r(c1)) * ratio);
-      const green = Math.round(g(c1) + (g(c2) - g(c1)) * ratio);
-      const blue = Math.round(b(c1) + (b(c2) - b(c1)) * ratio);
-      
-      return `rgb(${red}, ${green}, ${blue})`;
-    }
-
-    // Get AQI level
-    function getAQILevel(value, pollutant) {
-      const limits = pollutants[pollutant].limits;
-      for (let i = 0; i < limits.length; i++) {
-        if (value <= limits[i]) return aqiLevels[i];
-      }
-      return aqiLevels[aqiLevels.length - 1];
-    }
-
-    // Format date
-    function formatDate(date) {
-      const months = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
-      return `${date.getFullYear()}年${months[date.getMonth()]}${date.getDate()}日`;
-    }
-
-    // Render pollutant buttons
-    function renderPollutantButtons() {
-      const container = document.getElementById('pollutant-buttons');
-      container.innerHTML = '';
-      
-      Object.keys(pollutants).forEach(p => {
-        const btn = document.createElement('button');
-        btn.className = `pollutant-btn px-4 py-2 rounded-lg font-medium text-sm transition-all ${
-          currentPollutant === p 
-            ? 'active bg-gradient-to-r from-indigo-600 to-purple-600 text-white' 
-            : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-        }`;
-        btn.style.setProperty('--glow-color', pollutants[p].color.replace('#', '').match(/.{2}/g).map(x => parseInt(x, 16)).join(','));
-        btn.textContent = p;
-        btn.onclick = () => {
-          currentPollutant = p;
-          renderPollutantButtons();
-          renderRadialChart();
-          updateStats();
-        };
-        container.appendChild(btn);
-      });
-      
-      // Update info
-      document.getElementById('current-pollutant-info').textContent = pollutants[currentPollutant].description;
-    }
-
-    // Render year pills
-    function renderYearPills() {
-      const container = document.getElementById('year-pills');
-      container.innerHTML = '';
-      
-      for (let y = 2015; y <= 2026; y++) {
-        const pill = document.createElement('button');
-        const isActive = y >= yearStart && y <= yearEnd;
-        pill.className = `px-3 py-1 rounded-full text-xs font-medium transition-all ${
-          isActive 
-            ? 'bg-indigo-600/30 text-indigo-300 border border-indigo-500/50' 
-            : 'bg-slate-700/50 text-slate-500 border border-slate-600/30'
-        }`;
-        pill.textContent = y;
-        pill.onclick = () => {
-          if (y < yearEnd) {
-            yearStart = y;
-          } else {
-            yearEnd = y;
-          }
-          updateYearRange();
-          renderYearPills();
-          renderRadialChart();
-          updateStats();
-        };
-        container.appendChild(pill);
-      }
-    }
-
-    // Update year range UI
-    function updateYearRange() {
-      document.getElementById('year-start-label').textContent = yearStart;
-      document.getElementById('year-end-label').textContent = yearEnd;
-      
-      const fillStart = ((yearStart - 2015) / 11) * 100;
-      const fillEnd = ((yearEnd - 2015) / 11) * 100;
-      document.getElementById('year-range-fill').style.left = `${fillStart}%`;
-      document.getElementById('year-range-fill').style.width = `${fillEnd - fillStart}%`;
+    function hexToRgb(hex) {
+      const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+      return result ? {
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16)
+      } : { r: 0, g: 0, b: 0 };
     }
 
     // Render radial chart
-    function renderRadialChart() {
+    function renderChart() {
       const svg = document.getElementById('radial-chart');
-      const container = document.getElementById('chart-container');
-      const rect = container.getBoundingClientRect();
-      const size = Math.min(rect.width, rect.height);
-      const cx = size / 2;
-      const cy = size / 2;
-      
-      // Filter data by year range
-      const filteredData = allData.filter(d => d.year >= yearStart && d.year <= yearEnd);
-      const years = [...new Set(filteredData.map(d => d.year))].sort();
-      const numYears = years.length;
-      
-      // Calculate radii
-      const innerRadius = size * 0.12;
-      const outerRadius = size * 0.45;
-      const ringWidth = (outerRadius - innerRadius) / numYears;
-      
       svg.innerHTML = '';
-      svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
       
-      // Background circle
-      const bgCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-      bgCircle.setAttribute('cx', cx);
-      bgCircle.setAttribute('cy', cy);
-      bgCircle.setAttribute('r', outerRadius + 10);
-      bgCircle.setAttribute('fill', 'rgba(15, 23, 42, 0.5)');
-      svg.appendChild(bgCircle);
+      const cx = 300, cy = 300;
+      const minRadius = 60;
+      const maxRadius = 270;
+      const years = [];
       
-      // Month labels and guides
-      const months = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
-      const monthDays = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
+      for (let y = yearStart; y <= yearEnd; y++) {
+        years.push(y);
+      }
       
-      months.forEach((month, i) => {
-        const dayOfYear = monthDays[i] + 15; // Middle of month
-        const angle = (dayOfYear / 365) * Math.PI * 2 - Math.PI / 2;
-        const labelRadius = outerRadius + 25;
-        const x = cx + Math.cos(angle) * labelRadius;
-        const y = cy + Math.sin(angle) * labelRadius;
+      if (years.length === 0) return;
+      
+      const ringWidth = (maxRadius - minRadius) / years.length;
+      
+      // Background circles for reference
+      const bgGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      bgGroup.setAttribute('class', 'background-rings');
+      
+      for (let i = 0; i <= years.length; i++) {
+        const r = minRadius + i * ringWidth;
+        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circle.setAttribute('cx', cx);
+        circle.setAttribute('cy', cy);
+        circle.setAttribute('r', r);
+        circle.setAttribute('fill', 'none');
+        circle.setAttribute('stroke', 'rgba(255,255,255,0.05)');
+        circle.setAttribute('stroke-width', '1');
+        bgGroup.appendChild(circle);
+      }
+      svg.appendChild(bgGroup);
+      
+      // Season lines
+      const seasonGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      seasonGroup.setAttribute('class', 'season-lines');
+      
+      const seasons = [
+        { angle: 0, label: 'JAN' },
+        { angle: Math.PI / 2, label: 'APR' },
+        { angle: Math.PI, label: 'JUL' },
+        { angle: 3 * Math.PI / 2, label: 'OCT' }
+      ];
+      
+      seasons.forEach(s => {
+        const x1 = cx + Math.sin(s.angle) * (minRadius - 10);
+        const y1 = cy - Math.cos(s.angle) * (minRadius - 10);
+        const x2 = cx + Math.sin(s.angle) * (maxRadius + 5);
+        const y2 = cy - Math.cos(s.angle) * (maxRadius + 5);
         
-        // Guide line
         const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-        line.setAttribute('x1', cx + Math.cos(angle) * innerRadius);
-        line.setAttribute('y1', cy + Math.sin(angle) * innerRadius);
-        line.setAttribute('x2', cx + Math.cos(angle) * (outerRadius + 5));
-        line.setAttribute('y2', cy + Math.sin(angle) * (outerRadius + 5));
-        line.setAttribute('stroke', 'rgba(71, 85, 105, 0.3)');
+        line.setAttribute('x1', x1);
+        line.setAttribute('y1', y1);
+        line.setAttribute('x2', x2);
+        line.setAttribute('y2', y2);
+        line.setAttribute('stroke', 'rgba(255,255,255,0.1)');
         line.setAttribute('stroke-width', '1');
-        svg.appendChild(line);
+        line.setAttribute('stroke-dasharray', '3,3');
+        seasonGroup.appendChild(line);
         
         // Label
+        const labelX = cx + Math.sin(s.angle) * (maxRadius + 20);
+        const labelY = cy - Math.cos(s.angle) * (maxRadius + 20);
         const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        text.setAttribute('x', x);
-        text.setAttribute('y', y);
+        text.setAttribute('x', labelX);
+        text.setAttribute('y', labelY);
         text.setAttribute('text-anchor', 'middle');
         text.setAttribute('dominant-baseline', 'middle');
-        text.setAttribute('fill', '#94a3b8');
-        text.setAttribute('font-size', '11');
-        text.setAttribute('class', 'month-label');
-        text.textContent = month;
-        svg.appendChild(text);
+        text.setAttribute('fill', 'rgba(255,255,255,0.4)');
+        text.setAttribute('font-size', '10');
+        text.setAttribute('class', 'season-label');
+        text.textContent = s.label;
+        seasonGroup.appendChild(text);
       });
+      svg.appendChild(seasonGroup);
       
-      // Year labels
-      years.forEach((year, i) => {
-        const radius = innerRadius + ringWidth * i + ringWidth / 2;
-        const angle = -Math.PI / 2 - 0.15;
-        const x = cx + Math.cos(angle) * radius;
-        const y = cy + Math.sin(angle) * radius;
+      // Data rings
+      const dataGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      dataGroup.setAttribute('class', 'data-rings');
+      
+      years.forEach((year, yearIndex) => {
+        const yearData = pollutionData[selectedPollutant][year];
+        if (!yearData) return;
+        
+        const innerRadius = minRadius + yearIndex * ringWidth;
+        const outerRadius = innerRadius + ringWidth - 1;
+        
+        const yearGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        yearGroup.setAttribute('class', 'year-ring');
+        yearGroup.setAttribute('data-year', year);
+        
+        const daysInYear = yearData.length;
+        const angleStep = (Math.PI * 2) / daysInYear;
+        
+        yearData.forEach((value, dayIndex) => {
+          const startAngle = dayIndex * angleStep - Math.PI / 2;
+          const endAngle = (dayIndex + 1) * angleStep - Math.PI / 2;
+          
+          const x1Inner = cx + Math.cos(startAngle) * innerRadius;
+          const y1Inner = cy + Math.sin(startAngle) * innerRadius;
+          const x2Inner = cx + Math.cos(endAngle) * innerRadius;
+          const y2Inner = cy + Math.sin(endAngle) * innerRadius;
+          const x1Outer = cx + Math.cos(startAngle) * outerRadius;
+          const y1Outer = cy + Math.sin(startAngle) * outerRadius;
+          const x2Outer = cx + Math.cos(endAngle) * outerRadius;
+          const y2Outer = cy + Math.sin(endAngle) * outerRadius;
+          
+          const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          const d = `M ${x1Inner} ${y1Inner} 
+                     A ${innerRadius} ${innerRadius} 0 0 1 ${x2Inner} ${y2Inner}
+                     L ${x2Outer} ${y2Outer}
+                     A ${outerRadius} ${outerRadius} 0 0 0 ${x1Outer} ${y1Outer}
+                     Z`;
+          
+          path.setAttribute('d', d);
+          path.setAttribute('fill', getColor(value, selectedPollutant));
+          path.setAttribute('data-value', value);
+          path.setAttribute('data-year', year);
+          path.setAttribute('data-day', dayIndex);
+          path.setAttribute('class', 'cursor-pointer transition-opacity duration-150');
+          
+          // Add hover events
+          path.addEventListener('mouseenter', (e) => showTooltip(e, value, year, dayIndex));
+          path.addEventListener('mouseleave', hideTooltip);
+          path.addEventListener('mousemove', moveTooltip);
+          
+          yearGroup.appendChild(path);
+        });
+        
+        dataGroup.appendChild(yearGroup);
+      });
+      svg.appendChild(dataGroup);
+      
+      // Year labels on the left
+      const labelGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      labelGroup.setAttribute('class', 'year-labels');
+      
+      years.forEach((year, yearIndex) => {
+        const radius = minRadius + (yearIndex + 0.5) * ringWidth;
+        const x = cx - radius - 5;
+        const y = cy;
         
         const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
         text.setAttribute('x', x);
         text.setAttribute('y', y);
-        text.setAttribute('text-anchor', 'middle');
+        text.setAttribute('text-anchor', 'end');
         text.setAttribute('dominant-baseline', 'middle');
-        text.setAttribute('fill', 'rgba(148, 163, 184, 0.6)');
+        text.setAttribute('fill', 'rgba(255,255,255,0.5)');
         text.setAttribute('font-size', '9');
-        text.setAttribute('font-family', 'JetBrains Mono, monospace');
-        text.textContent = year.toString().slice(2);
-        svg.appendChild(text);
+        text.setAttribute('class', 'mono');
+        text.textContent = year;
+        labelGroup.appendChild(text);
       });
+      svg.appendChild(labelGroup);
       
-      // Data segments
-      const tooltip = document.getElementById('tooltip');
+      // Center info
+      const centerGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      centerGroup.setAttribute('class', 'center-info');
       
-      filteredData.forEach(d => {
-        const yearIndex = years.indexOf(d.year);
-        const innerR = innerRadius + ringWidth * yearIndex + 1;
-        const outerR = innerRadius + ringWidth * (yearIndex + 1) - 1;
-        
-        const startAngle = ((d.dayOfYear - 1) / 365) * Math.PI * 2 - Math.PI / 2;
-        const endAngle = (d.dayOfYear / 365) * Math.PI * 2 - Math.PI / 2;
-        
-        const value = d[currentPollutant];
-        const color = getColor(value, currentPollutant);
-        
-        const x1Inner = cx + Math.cos(startAngle) * innerR;
-        const y1Inner = cy + Math.sin(startAngle) * innerR;
-        const x2Inner = cx + Math.cos(endAngle) * innerR;
-        const y2Inner = cy + Math.sin(endAngle) * innerR;
-        const x1Outer = cx + Math.cos(startAngle) * outerR;
-        const y1Outer = cy + Math.sin(startAngle) * outerR;
-        const x2Outer = cx + Math.cos(endAngle) * outerR;
-        const y2Outer = cy + Math.sin(endAngle) * outerR;
-        
-        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-        const d_attr = `M ${x1Inner} ${y1Inner} 
-                        A ${innerR} ${innerR} 0 0 1 ${x2Inner} ${y2Inner} 
-                        L ${x2Outer} ${y2Outer} 
-                        A ${outerR} ${outerR} 0 0 0 ${x1Outer} ${y1Outer} 
-                        Z`;
-        
-        path.setAttribute('d', d_attr);
-        path.setAttribute('fill', color);
-        path.setAttribute('class', 'radial-segment');
-        path.setAttribute('data-year', d.year);
-        path.setAttribute('data-day', d.dayOfYear);
-        
-        // Hover events
-        path.addEventListener('mouseenter', (e) => {
-          const level = getAQILevel(value, currentPollutant);
-          document.getElementById('tooltip-date').textContent = formatDate(d.date);
-          document.getElementById('tooltip-value').textContent = `${currentPollutant}: ${value} ${pollutants[currentPollutant].unit}`;
-          document.getElementById('tooltip-level').textContent = level.name;
-          document.getElementById('tooltip-level').style.color = level.color;
-          document.getElementById('tooltip-level-dot').style.backgroundColor = level.color;
-          
-          tooltip.classList.remove('hidden');
-          
-          const tooltipRect = tooltip.getBoundingClientRect();
-          const containerRect = container.getBoundingClientRect();
-          let left = e.clientX - containerRect.left + 15;
-          let top = e.clientY - containerRect.top + 15;
-          
-          if (left + tooltipRect.width > containerRect.width) {
-            left = e.clientX - containerRect.left - tooltipRect.width - 15;
-          }
-          if (top + tooltipRect.height > containerRect.height) {
-            top = e.clientY - containerRect.top - tooltipRect.height - 15;
-          }
-          
-          tooltip.style.left = `${left}px`;
-          tooltip.style.top = `${top}px`;
-        });
-        
-        path.addEventListener('mouseleave', () => {
-          tooltip.classList.add('hidden');
-        });
-        
-        svg.appendChild(path);
-      });
-      
-      // Center decoration
       const centerCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
       centerCircle.setAttribute('cx', cx);
       centerCircle.setAttribute('cy', cy);
-      centerCircle.setAttribute('r', innerRadius - 5);
-      centerCircle.setAttribute('fill', 'url(#centerGradient)');
+      centerCircle.setAttribute('r', minRadius - 5);
+      centerCircle.setAttribute('fill', 'rgba(15, 23, 42, 0.9)');
+      centerCircle.setAttribute('stroke', 'rgba(255,255,255,0.1)');
+      centerGroup.appendChild(centerCircle);
       
-      const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
-      const gradient = document.createElementNS('http://www.w3.org/2000/svg', 'radialGradient');
-      gradient.setAttribute('id', 'centerGradient');
+      const pollutantLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      pollutantLabel.setAttribute('x', cx);
+      pollutantLabel.setAttribute('y', cy - 10);
+      pollutantLabel.setAttribute('text-anchor', 'middle');
+      pollutantLabel.setAttribute('fill', 'white');
+      pollutantLabel.setAttribute('font-size', '18');
+      pollutantLabel.setAttribute('font-weight', 'bold');
+      pollutantLabel.textContent = pollutants[selectedPollutant].name;
+      centerGroup.appendChild(pollutantLabel);
       
-      const stop1 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
-      stop1.setAttribute('offset', '0%');
-      stop1.setAttribute('stop-color', '#1e293b');
+      const unitLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      unitLabel.setAttribute('x', cx);
+      unitLabel.setAttribute('y', cy + 12);
+      unitLabel.setAttribute('text-anchor', 'middle');
+      unitLabel.setAttribute('fill', 'rgba(255,255,255,0.5)');
+      unitLabel.setAttribute('font-size', '12');
+      unitLabel.setAttribute('class', 'mono');
+      unitLabel.textContent = pollutants[selectedPollutant].unit;
+      centerGroup.appendChild(unitLabel);
       
-      const stop2 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
-      stop2.setAttribute('offset', '100%');
-      stop2.setAttribute('stop-color', '#0f172a');
+      svg.appendChild(centerGroup);
       
-      gradient.appendChild(stop1);
-      gradient.appendChild(stop2);
-      defs.appendChild(gradient);
-      svg.appendChild(defs);
-      svg.appendChild(centerCircle);
-      
-      // Center text
-      const centerText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      centerText.setAttribute('x', cx);
-      centerText.setAttribute('y', cy);
-      centerText.setAttribute('text-anchor', 'middle');
-      centerText.setAttribute('dominant-baseline', 'middle');
-      centerText.setAttribute('fill', '#e2e8f0');
-      centerText.setAttribute('font-size', '14');
-      centerText.setAttribute('font-weight', '600');
-      centerText.textContent = currentPollutant;
-      svg.appendChild(centerText);
+      updateStats();
+      updateLegend();
+      updateInsight();
     }
 
-    // Update statistics
+    // Tooltip functions
+    function showTooltip(event, value, year, dayIndex) {
+      const tooltip = document.getElementById('tooltip');
+      const date = new Date(year, 0, dayIndex + 1);
+      const dateStr = date.toLocaleDateString('en-US', { 
+        month: 'short', 
+        day: 'numeric', 
+        year: 'numeric' 
+      });
+      
+      document.getElementById('tooltip-date').textContent = dateStr;
+      document.getElementById('tooltip-value').textContent = value.toFixed(1);
+      document.getElementById('tooltip-unit').textContent = pollutants[selectedPollutant].unit;
+      
+      tooltip.classList.remove('hidden');
+      moveTooltip(event);
+    }
+
+    function moveTooltip(event) {
+      const tooltip = document.getElementById('tooltip');
+      const container = document.querySelector('.radial-container');
+      const rect = container.getBoundingClientRect();
+      
+      let x = event.clientX - rect.left + 15;
+      let y = event.clientY - rect.top - 10;
+      
+      // Keep tooltip in bounds
+      const tooltipRect = tooltip.getBoundingClientRect();
+      if (x + tooltipRect.width > rect.width) {
+        x = event.clientX - rect.left - tooltipRect.width - 15;
+      }
+      if (y + tooltipRect.height > rect.height) {
+        y = rect.height - tooltipRect.height - 10;
+      }
+      
+      tooltip.style.left = x + 'px';
+      tooltip.style.top = y + 'px';
+    }
+
+    function hideTooltip() {
+      document.getElementById('tooltip').classList.add('hidden');
+    }
+
+    // Update stats panel
     function updateStats() {
-      const filteredData = allData.filter(d => d.year >= yearStart && d.year <= yearEnd);
+      let allValues = [];
       
-      // Current pollutant
-      document.getElementById('stat-pollutant').textContent = currentPollutant;
-      document.getElementById('stat-unit').textContent = pollutants[currentPollutant].unit;
+      for (let y = yearStart; y <= yearEnd; y++) {
+        const yearData = pollutionData[selectedPollutant][y];
+        if (yearData) {
+          allValues = allValues.concat(yearData);
+        }
+      }
       
-      // Calculate trend
-      const firstYearData = allData.filter(d => d.year === yearStart);
-      const lastYearData = allData.filter(d => d.year === yearEnd);
-      const firstYearAvg = firstYearData.reduce((sum, d) => sum + d[currentPollutant], 0) / firstYearData.length;
-      const lastYearAvg = lastYearData.reduce((sum, d) => sum + d[currentPollutant], 0) / lastYearData.length;
-      const trendPercent = Math.round(((lastYearAvg - firstYearAvg) / firstYearAvg) * 100);
+      if (allValues.length === 0) return;
+      
+      const avg = allValues.reduce((a, b) => a + b, 0) / allValues.length;
+      const max = Math.max(...allValues);
+      const min = Math.min(...allValues);
+      
+      // Calculate trend (compare first half to second half)
+      const midpoint = Math.floor(allValues.length / 2);
+      const firstHalf = allValues.slice(0, midpoint);
+      const secondHalf = allValues.slice(midpoint);
+      const firstAvg = firstHalf.reduce((a, b) => a + b, 0) / firstHalf.length;
+      const secondAvg = secondHalf.reduce((a, b) => a + b, 0) / secondHalf.length;
+      const trendPercent = ((secondAvg - firstAvg) / firstAvg * 100).toFixed(1);
+      
+      document.getElementById('stat-avg').textContent = avg.toFixed(1);
+      document.getElementById('stat-max').textContent = max.toFixed(1);
+      document.getElementById('stat-min').textContent = min.toFixed(1);
       
       const trendEl = document.getElementById('stat-trend');
-      if (trendPercent <= 0) {
-        trendEl.className = 'text-xl font-bold text-emerald-400 flex items-center gap-2';
-        trendEl.innerHTML = `
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"/>
-          </svg>
-          ${trendPercent}%
-        `;
+      if (parseFloat(trendPercent) > 0) {
+        trendEl.textContent = `↑ ${trendPercent}%`;
+        trendEl.className = 'mono text-sm text-red-400';
       } else {
-        trendEl.className = 'text-xl font-bold text-red-400 flex items-center gap-2';
-        trendEl.innerHTML = `
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
-          </svg>
-          +${trendPercent}%
-        `;
+        trendEl.textContent = `↓ ${Math.abs(trendPercent)}%`;
+        trendEl.className = 'mono text-sm text-green-400';
       }
+    }
+
+    // Update legend
+    function updateLegend() {
+      const p = pollutants[selectedPollutant];
+      const gradient = document.getElementById('legend-gradient');
+      gradient.style.background = `linear-gradient(to right, ${p.colors.join(', ')})`;
       
-      // Peak season
-      const winterData = filteredData.filter(d => d.dayOfYear <= 59 || d.dayOfYear >= 335);
-      const summerData = filteredData.filter(d => d.dayOfYear >= 152 && d.dayOfYear <= 244);
-      const winterAvg = winterData.reduce((sum, d) => sum + d[currentPollutant], 0) / winterData.length;
-      const summerAvg = summerData.reduce((sum, d) => sum + d[currentPollutant], 0) / summerData.length;
+      document.getElementById('legend-min').textContent = '0';
+      document.getElementById('legend-max').textContent = p.max;
+      document.getElementById('legend-unit').textContent = p.unit;
+    }
+
+    // Update insight text
+    function updateInsight() {
+      const p = pollutants[selectedPollutant];
+      const insights = [
+        `${p.fullName} (${p.name}): ${p.description}.`,
+        `The chart reveals both seasonal patterns and long-term trends in ${p.name} concentrations.`,
+        `Hover over any segment to see exact values for specific days.`
+      ];
       
-      const seasonEl = document.getElementById('stat-season');
-      const seasonDetailEl = document.getElementById('stat-season-detail');
-      if (winterAvg > summerAvg) {
-        seasonEl.textContent = '冬季';
-        seasonEl.className = 'text-xl font-bold text-amber-400';
-        seasonDetailEl.textContent = '12月-2月';
-      } else {
-        seasonEl.textContent = '夏季';
-        seasonEl.className = 'text-xl font-bold text-orange-400';
-        seasonDetailEl.textContent = '6月-8月';
-      }
+      document.getElementById('insight-text').textContent = insights.join(' ');
+      document.getElementById('viz-title').textContent = `${p.fullName} Concentration`;
+    }
+
+    // Initialize pollutant buttons
+    function initPollutantButtons() {
+      const container = document.getElementById('pollutant-buttons');
+      container.innerHTML = '';
       
-      // Good days percentage
-      const limits = pollutants[currentPollutant].limits;
-      const goodDays = filteredData.filter(d => d[currentPollutant] <= limits[1]).length;
-      const goodPercent = Math.round((goodDays / filteredData.length) * 100);
-      document.getElementById('stat-good-days').innerHTML = `<span class="${goodPercent >= 70 ? 'text-emerald-400' : 'text-amber-400'}">${goodPercent}%</span>`;
+      Object.keys(pollutants).forEach(key => {
+        const p = pollutants[key];
+        const btn = document.createElement('button');
+        btn.className = `pollutant-btn px-3 py-2 rounded-lg text-sm font-medium border transition-all ${
+          key === selectedPollutant 
+            ? 'bg-blue-500/30 border-blue-400 text-blue-300 active' 
+            : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10 hover:border-white/20'
+        }`;
+        btn.textContent = p.name;
+        btn.setAttribute('data-pollutant', key);
+        
+        btn.addEventListener('click', () => {
+          selectedPollutant = key;
+          document.querySelectorAll('.pollutant-btn').forEach(b => {
+            b.classList.remove('bg-blue-500/30', 'border-blue-400', 'text-blue-300', 'active');
+            b.classList.add('bg-white/5', 'border-white/10', 'text-slate-400');
+          });
+          btn.classList.remove('bg-white/5', 'border-white/10', 'text-slate-400');
+          btn.classList.add('bg-blue-500/30', 'border-blue-400', 'text-blue-300', 'active');
+          renderChart();
+        });
+        
+        container.appendChild(btn);
+      });
+    }
+
+    // Initialize year range sliders
+    function initYearSliders() {
+      const startSlider = document.getElementById('year-start');
+      const endSlider = document.getElementById('year-end');
+      const startVal = document.getElementById('year-start-val');
+      const endVal = document.getElementById('year-end-val');
       
-      // Data coverage
-      document.getElementById('stat-coverage').textContent = `${filteredData.length.toLocaleString()} 天`;
+      startSlider.addEventListener('input', (e) => {
+        yearStart = parseInt(e.target.value);
+        if (yearStart > yearEnd) {
+          yearEnd = yearStart;
+          endSlider.value = yearEnd;
+          endVal.textContent = yearEnd;
+        }
+        startVal.textContent = yearStart;
+        renderChart();
+      });
+      
+      endSlider.addEventListener('input', (e) => {
+        yearEnd = parseInt(e.target.value);
+        if (yearEnd < yearStart) {
+          yearStart = yearEnd;
+          startSlider.value = yearStart;
+          startVal.textContent = yearStart;
+        }
+        endVal.textContent = yearEnd;
+        renderChart();
+      });
     }
 
     // Narrative mode
-    function renderNarrativeStep() {
-      const step = narrativeSteps[narrativeStep];
+    function initNarrative() {
+      const overlay = document.getElementById('narrative-overlay');
       const content = document.getElementById('narrative-content');
+      const dots = document.getElementById('narrative-dots');
+      const prevBtn = document.getElementById('prev-narrative');
+      const nextBtn = document.getElementById('next-narrative');
       
-      content.innerHTML = `
-        <h3 class="text-2xl font-bold text-white mb-4">${step.title}</h3>
-        ${step.content}
-      `;
-      
-      // Update pollutant if specified
-      if (step.pollutant && step.pollutant !== currentPollutant) {
-        currentPollutant = step.pollutant;
-        renderPollutantButtons();
-        renderRadialChart();
-        updateStats();
-      }
-      
-      // Update navigation buttons
-      document.getElementById('narrative-prev').disabled = narrativeStep === 0;
-      const nextBtn = document.getElementById('narrative-next');
-      if (narrativeStep === narrativeSteps.length - 1) {
-        nextBtn.textContent = '开始探索 →';
-      } else {
-        nextBtn.textContent = '下一步 →';
-      }
-      
-      // Update progress dots
-      const progress = document.getElementById('narrative-progress');
-      progress.innerHTML = narrativeSteps.map((_, i) => `
-        <div class="w-2 h-2 rounded-full transition-all ${i === narrativeStep ? 'bg-indigo-500 w-6' : 'bg-slate-600'}"></div>
-      `).join('');
-    }
-
-    function showNarrative() {
-      narrativeStep = 0;
-      document.getElementById('narrative-overlay').classList.remove('hidden');
-      renderNarrativeStep();
-    }
-
-    function hideNarrative() {
-      document.getElementById('narrative-overlay').classList.add('hidden');
-    }
-
-    // Apply config to UI
-    function applyConfig() {
-      document.getElementById('main-title').textContent = config.chart_title || defaultConfig.chart_title;
-      document.getElementById('city-display').textContent = config.city_name || defaultConfig.city_name;
-      
-      document.body.style.background = `linear-gradient(135deg, ${config.primary_color} 0%, ${config.secondary_color} 50%, ${config.primary_color} 100%)`;
-    }
-
-    // Initialize
-    async function init() {
-      // Generate data
-      allData = generateData();
-      
-      // Setup year range sliders
-      const yearStartSlider = document.getElementById('year-start');
-      const yearEndSlider = document.getElementById('year-end');
-      
-      yearStartSlider.addEventListener('input', (e) => {
-        const val = parseInt(e.target.value);
-        if (val < yearEnd) {
-          yearStart = val;
-          updateYearRange();
-          renderYearPills();
-          renderRadialChart();
-          updateStats();
-        }
+      document.getElementById('narrative-btn').addEventListener('click', () => {
+        narrativeStep = 0;
+        updateNarrative();
+        overlay.classList.remove('hidden');
       });
       
-      yearEndSlider.addEventListener('input', (e) => {
-        const val = parseInt(e.target.value);
-        if (val > yearStart) {
-          yearEnd = val;
-          updateYearRange();
-          renderYearPills();
-          renderRadialChart();
-          updateStats();
-        }
+      document.getElementById('close-narrative').addEventListener('click', () => {
+        overlay.classList.add('hidden');
       });
       
-      // Narrative mode buttons
-      document.getElementById('narrative-btn').addEventListener('click', showNarrative);
-      document.getElementById('narrative-close').addEventListener('click', hideNarrative);
-      document.getElementById('narrative-prev').addEventListener('click', () => {
+      prevBtn.addEventListener('click', () => {
         if (narrativeStep > 0) {
           narrativeStep--;
-          renderNarrativeStep();
+          updateNarrative();
         }
       });
-      document.getElementById('narrative-next').addEventListener('click', () => {
+      
+      nextBtn.addEventListener('click', () => {
         if (narrativeStep < narrativeSteps.length - 1) {
           narrativeStep++;
-          renderNarrativeStep();
+          updateNarrative();
         } else {
-          hideNarrative();
+          overlay.classList.add('hidden');
         }
       });
       
-      // Initial render
-      renderPollutantButtons();
-      renderYearPills();
-      updateYearRange();
-      renderRadialChart();
-      updateStats();
-      applyConfig();
-      
-      // Handle resize
-      let resizeTimeout;
-      window.addEventListener('resize', () => {
-        clearTimeout(resizeTimeout);
-        resizeTimeout = setTimeout(renderRadialChart, 150);
-      });
-      
-      // Initialize Element SDK
+      function updateNarrative() {
+        const step = narrativeSteps[narrativeStep];
+        
+        content.innerHTML = `
+          <div class="text-6xl mb-6 opacity-20">${narrativeStep + 1}</div>
+          <h2 class="text-3xl font-bold mb-4 gradient-text">${step.title}</h2>
+          <p class="text-xl text-slate-300 leading-relaxed">${step.content}</p>
+        `;
+        
+        // Update dots
+        dots.innerHTML = '';
+        narrativeSteps.forEach((_, i) => {
+          const dot = document.createElement('div');
+          dot.className = `w-2 h-2 rounded-full transition-all ${
+            i === narrativeStep ? 'bg-blue-400 scale-125' : 'bg-slate-600'
+          }`;
+          dots.appendChild(dot);
+        });
+        
+        // Update buttons
+        prevBtn.disabled = narrativeStep === 0;
+        nextBtn.textContent = narrativeStep === narrativeSteps.length - 1 ? 'Explore →' : 'Next →';
+        
+        // Handle highlights
+        if (step.highlight && step.highlight in pollutants) {
+          selectedPollutant = step.highlight;
+          initPollutantButtons();
+          renderChart();
+        }
+      }
+    }
+
+    // Element SDK integration
+    function initElementSdk() {
       if (window.elementSdk) {
         window.elementSdk.init({
           defaultConfig,
           onConfigChange: async (newConfig) => {
             config = { ...defaultConfig, ...newConfig };
-            applyConfig();
+            
+            document.getElementById('main-title').textContent = config.main_title || defaultConfig.main_title;
+            document.getElementById('subtitle').textContent = config.subtitle || defaultConfig.subtitle;
+            
+            // Apply colors
+            document.body.style.backgroundColor = config.background_color || defaultConfig.background_color;
           },
-          mapToCapabilities: (cfg) => ({
+          mapToCapabilities: (config) => ({
             recolorables: [
               {
-                get: () => cfg.primary_color || defaultConfig.primary_color,
-                set: (v) => { cfg.primary_color = v; window.elementSdk.setConfig({ primary_color: v }); }
+                get: () => config.background_color || defaultConfig.background_color,
+                set: (value) => {
+                  config.background_color = value;
+                  window.elementSdk.setConfig({ background_color: value });
+                }
               },
               {
-                get: () => cfg.secondary_color || defaultConfig.secondary_color,
-                set: (v) => { cfg.secondary_color = v; window.elementSdk.setConfig({ secondary_color: v }); }
+                get: () => config.secondary_color || defaultConfig.secondary_color,
+                set: (value) => {
+                  config.secondary_color = value;
+                  window.elementSdk.setConfig({ secondary_color: value });
+                }
               },
               {
-                get: () => cfg.text_color || defaultConfig.text_color,
-                set: (v) => { cfg.text_color = v; window.elementSdk.setConfig({ text_color: v }); }
+                get: () => config.text_color || defaultConfig.text_color,
+                set: (value) => {
+                  config.text_color = value;
+                  window.elementSdk.setConfig({ text_color: value });
+                }
               },
               {
-                get: () => cfg.accent_color || defaultConfig.accent_color,
-                set: (v) => { cfg.accent_color = v; window.elementSdk.setConfig({ accent_color: v }); }
+                get: () => config.primary_color || defaultConfig.primary_color,
+                set: (value) => {
+                  config.primary_color = value;
+                  window.elementSdk.setConfig({ primary_color: value });
+                }
               },
               {
-                get: () => cfg.highlight_color || defaultConfig.highlight_color,
-                set: (v) => { cfg.highlight_color = v; window.elementSdk.setConfig({ highlight_color: v }); }
+                get: () => config.accent_color || defaultConfig.accent_color,
+                set: (value) => {
+                  config.accent_color = value;
+                  window.elementSdk.setConfig({ accent_color: value });
+                }
               }
             ],
             borderables: [],
             fontEditable: undefined,
             fontSizeable: undefined
           }),
-          mapToEditPanelValues: (cfg) => new Map([
-            ['chart_title', cfg.chart_title || defaultConfig.chart_title],
-            ['city_name', cfg.city_name || defaultConfig.city_name]
+          mapToEditPanelValues: (config) => new Map([
+            ['main_title', config.main_title || defaultConfig.main_title],
+            ['subtitle', config.subtitle || defaultConfig.subtitle]
           ])
         });
       }
     }
 
+    // Initialize everything
+    async function init() {
+  initElementSdk();
+  initPollutantButtons();
+  initYearSliders();
+  initNarrative();
+
+  pollutionData = await loadCSVData();
+  renderChart();
+}
+
+
     init();
   </script>
- <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9cdab74a7172e7bc',t:'MTc3MTA1MjcxNC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9cdae88b05e02f12',t:'MTc3MTA1NDczMi4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
