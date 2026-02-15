@@ -738,41 +738,49 @@
 
     // Update stats panel
     function updateStats() {
-      let allValues = [];
+     const data = pollutionData[currentPollutant][currentYear];
+     
+     if (!data || data.length === 0) {
+      document.getElementById('avg').innerText = '--';
+      document.getElementById('max').innerText = '--';
+      document.getElementById('min').innerText = '--';
+      document.getElementById('trend').innerText = '--';
+      return;
+     }
+
+  // 过滤无效值
+     const validData = data.filter(v => typeof v === 'number' && !isNaN(v));
+     
+     if (validData.length === 0) return;
+     
+     const sum = validData.reduce((a, b) => a + b, 0);
+     const avg = sum / validData.length;
+     const max = Math.max(...validData);
+     const min = Math.min(...validData);
+
+  // 计算趋势（前后均值对比）
+     const firstHalf = validData.slice(0, Math.floor(validData.length / 2));
+     const secondHalf = validData.slice(Math.floor(validData.length / 2));
+     
+     const avgFirst =
+      firstHalf.reduce((a, b) => a + b, 0) / firstHalf.length;
+     
+     const avgSecond =
+      secondHalf.reduce((a, b) => a + b, 0) / secondHalf.length;
+     
+     const trendPercent = ((avgSecond - avgFirst) / avgFirst) * 100;
+     
+     document.getElementById('avg').innerText = avg.toFixed(1);
+     document.getElementById('max').innerText = max.toFixed(1);
+     document.getElementById('min').innerText = min.toFixed(1);
+     
+     document.getElementById('trend').innerText =
       
-      for (let y = yearStart; y <= yearEnd; y++) {
-        const yearData = pollutionData[selectedPollutant][y];
-        if (yearData) {
-          allValues = allValues.concat(yearData);
-        }
-      }
-      
-      if (allValues.length === 0) return;
-      
-      const avg = allValues.reduce((a, b) => a + b, 0) / allValues.length;
-      const max = Math.max(...allValues);
-      const min = Math.min(...allValues);
-      
-      const midpoint = Math.floor(allValues.length / 2);
-      const firstHalf = allValues.slice(0, midpoint);
-      const secondHalf = allValues.slice(midpoint);
-      const firstAvg = firstHalf.reduce((a, b) => a + b, 0) / firstHalf.length;
-      const secondAvg = secondHalf.reduce((a, b) => a + b, 0) / secondHalf.length;
-      const trendPercent = ((secondAvg - firstAvg) / firstAvg * 100).toFixed(1);
-      
-      document.getElementById('stat-avg').textContent = avg.toFixed(1);
-      document.getElementById('stat-max').textContent = max.toFixed(1);
-      document.getElementById('stat-min').textContent = min.toFixed(1);
-      
-      const trendEl = document.getElementById('stat-trend');
-      if (parseFloat(trendPercent) > 0) {
-        trendEl.textContent = `↑ ${trendPercent}%`;
-        trendEl.className = 'mono text-sm text-red-400';
-      } else {
-        trendEl.textContent = `↓ ${Math.abs(trendPercent)}%`;
-        trendEl.className = 'mono text-sm text-green-400';
-      }
+      (trendPercent > 0 ? '↑ ' : '↓ ') +
+      Math.abs(trendPercent).toFixed(1) +
+      '%';
     }
+
 
     // Update legend
     function updateLegend() {
