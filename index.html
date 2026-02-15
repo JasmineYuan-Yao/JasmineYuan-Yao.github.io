@@ -296,50 +296,43 @@
         description: 'Colorless, odorless gas from incomplete combustion'
       }
     };
-
-    // Load real CSV data from GitHub
+   
    async function loadCSVData() {
-    const response = await fetch('shanghai.csv'); // 确保文件在同级目录
+    const response = await fetch('shanghai.csv');
     const text = await response.text();
     
-    const rows = text.trim().split('\n');
-    const headers = rows[0].split(/\s+/);
+    const lines = text.trim().split('\n');
     
-    const data = {};
-    
+    const headers = lines[0].split(',');
+
+  // 初始化结
     Object.keys(pollutants).forEach(p => {
-     data[p] = {};
+     pollutionData[p] = {};
     });
     
-    for (let i = 1; i < rows.length; i++) {
+    for (let i = 1; i < lines.length; i++) {
+     const row = lines[i].split(',');
      
-     const cols = rows[i].split(/\s+/);
-     
-     const dateStr = cols[0];
+     const dateStr = row[0];
      const date = new Date(dateStr);
-     
      const year = date.getFullYear();
      const dayOfYear = Math.floor(
-      (date - new Date(year, 0, 0)) / 86400000
+      (date - new Date(year, 0, 0)) / (1000 * 60 * 60 * 24)
      ) - 1;
      
-     const mapping = {
-      'PM2.5': parseFloat(cols[1]),
-      'PM10': parseFloat(cols[2]),
-      'O3': parseFloat(cols[3]),
-      'NO2': parseFloat(cols[4]),
-      'SO2': parseFloat(cols[5]),
-      'CO': parseFloat(cols[6])
-     };
+     if (!pollutionData['PM2.5'][year]) {
+      Object.keys(pollutants).forEach(p => {
+       pollutionData[p][year] = [];
+      });
+     }
      
-     Object.keys(mapping).forEach(pollutant => {
-      if (!data[pollutant][year]) {
-       data[pollutant][year] = [];
-      }
-      data[pollutant][year][dayOfYear] = mapping[pollutant];
-     });
+     pollutionData['PM2.5'][year][dayOfYear] = parseFloat(row[1]);
+     pollutionData['PM10'][year][dayOfYear] = parseFloat(row[2]);
+     pollutionData['O3'][year][dayOfYear] = parseFloat(row[3]);
+     pollutionData['NO2'][year][dayOfYear] = parseFloat(row[4]);
+     pollutionData['SO2'][year][dayOfYear] = parseFloat(row[5]);
+     pollutionData['CO'][year][dayOfYear] = parseFloat(row[6]);
     }
-    return data;
    }
 
 
@@ -1069,11 +1062,15 @@
     // Initialize everything
     function init() {
       initElementSdk();
-      initMiniRadials();
-      initPollutantButtons();
-      initYearSliders();
-      initNarrative();
-      renderChart();
+      document.addEventListener('DOMContentLoaded', async () => {
+       await loadCSVData();
+       initMiniRadials();
+       initPollutantButtons();
+       initYearSliders();
+       initNarrative();
+       renderChart();
+      });
+
     }
 
     init();
