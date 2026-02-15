@@ -298,48 +298,49 @@
     };
 
     // Load real CSV data from GitHub
-async function loadCSVData() {
-  const response = await fetch('shanghai.csv'); // 确保文件在同级目录
-  const text = await response.text();
-
-  const rows = text.trim().split('\n');
-  const headers = rows[0].split(/\s+/);
-
-  const data = {};
-
-  Object.keys(pollutants).forEach(p => {
-    data[p] = {};
-  });
-
-  for (let i = 1; i < rows.length; i++) {
-    const cols = rows[i].split(/\s+/);
-
-    const dateStr = cols[0];
-    const date = new Date(dateStr);
-    const year = date.getFullYear();
-    const dayOfYear = Math.floor(
+   async function loadCSVData() {
+    const response = await fetch('shanghai.csv'); // 确保文件在同级目录
+    const text = await response.text();
+    
+    const rows = text.trim().split('\n');
+    const headers = rows[0].split(/\s+/);
+    
+    const data = {};
+    
+    Object.keys(pollutants).forEach(p => {
+     data[p] = {};
+    });
+    
+    for (let i = 1; i < rows.length; i++) {
+     
+     const cols = rows[i].split(/\s+/);
+     
+     const dateStr = cols[0];
+     const date = new Date(dateStr);
+     
+     const year = date.getFullYear();
+     const dayOfYear = Math.floor(
       (date - new Date(year, 0, 0)) / 86400000
-    ) - 1;
-
-    const mapping = {
+     ) - 1;
+     
+     const mapping = {
       'PM2.5': parseFloat(cols[1]),
       'PM10': parseFloat(cols[2]),
       'O3': parseFloat(cols[3]),
       'NO2': parseFloat(cols[4]),
       'SO2': parseFloat(cols[5]),
       'CO': parseFloat(cols[6])
-    };
-
-    Object.keys(mapping).forEach(pollutant => {
+     };
+     
+     Object.keys(mapping).forEach(pollutant => {
       if (!data[pollutant][year]) {
-        data[pollutant][year] = [];
+       data[pollutant][year] = [];
       }
       data[pollutant][year][dayOfYear] = mapping[pollutant];
-    });
-  }
-
-  return data;
-}
+     });
+    }
+    return data;
+   }
 
 
     // State
